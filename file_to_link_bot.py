@@ -1,19 +1,26 @@
 import os
-from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
-load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
-    raise RuntimeError("Please set BOT_TOKEN in your .env file")
+    raise RuntimeError("BOT_TOKEN not set in Render Environment Variables")
 
+# /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Hi! Send me any file (photo, video, document, etc.) and I'll give you a direct download link!"
+        "👋 Hi! Send me any file and I will give you a direct download link."
     )
 
+
+# Handle all file uploads
 async def get_file_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     file = None
@@ -22,7 +29,7 @@ async def get_file_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message.document:
         file = message.document
     elif message.photo:
-        file = message.photo[-1]  # last = highest resolution
+        file = message.photo[-1]
     elif message.video:
         file = message.video
     elif message.audio:
@@ -33,29 +40,39 @@ async def get_file_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text("Please send a valid file 📁")
         return
 
-    # Get file info
+    # Get file object
     file_obj = await file.get_file()
     file_path = file_obj.file_path
+
+    # Create download link
     download_link = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
 
-    # Reply with link
+    # Reply to user
     await message.reply_text(
-        f"✅ File received!\n\n📎 File name: `{getattr(file, 'file_name', 'N/A')}`\n"
-        f"🔗 Direct download link:\n{download_link}\n\n⚠️ Keep this link private; "
-        f"anyone with it can access your file.",
-        parse_mode="Markdown"
+        f"✅ File received!\n\n"
+        f"🔗 Download link:\n{download_link}\n\n"
+        f"⚠️ Keep this link private."
     )
+
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(
-        filters.Document.ALL | filters.Video.ALL | filters.Audio.ALL |
-        filters.Photo.ALL | filters.Voice.ALL, get_file_link))
 
-    print("🤖 File-to-Link Bot is running... Press Ctrl+C to stop.")
+    # FILE FILTERS — compatible with Render version
+    app.add_handler(MessageHandler(
+        filters.Document.ALL |
+        filters.VIDEO |
+        filters.AUDIO |
+        filters.PHOTO |
+        filters.VOICE,
+        get_file_link
+    ))
+
+    print("🚀 Bot is running on Render ...")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
